@@ -18,6 +18,25 @@ from ..util import (
 )
 
 
+def build_h2o2_cost_param_block(blk):
+
+    blk.cost = pyo.Param(
+        mutable=True,
+        initialize=1.55,
+        doc="H2O2 cost",  # for Hydrogen peroxide, 70%, as is basis, tankcars, frt. equald. - CatCost v 1.0.4
+        units=pyo.units.USD_2020 / pyo.units.kg,
+    )
+    blk.purity = pyo.Param(
+        mutable=True,
+        initialize=0.70,
+        doc="H2O2 purity",
+        units=pyo.units.dimensionless,
+    )
+
+    costing = blk.parent_block()
+    costing.register_flow_type("h2o2", blk.cost / blk.purity)
+
+
 def build_uv_cost_param_block(blk):
 
     blk.factor_lamp_replacement = pyo.Var(
@@ -37,6 +56,10 @@ def build_uv_cost_param_block(blk):
     )
 
 
+@register_costing_parameter_block(
+    build_rule=build_h2o2_cost_param_block,
+    parameter_block_name="h2o2",
+)
 @register_costing_parameter_block(
     build_rule=build_uv_cost_param_block,
     parameter_block_name="ultraviolet",
@@ -61,6 +84,20 @@ def cost_uv_aop(blk, cost_electricity_flow=True):
             ),
             "electricity",
         )
+
+    blk.unit_model.mass_flow_hydrogen_peroxide = pyo.Expression(
+        expr=(
+            pyo.units.convert(
+                blk.unit_model.hydrogen_peroxide_dose
+                * blk.unit_model.control_volume.properties_in[t0].flow_vol_phase["Liq"],
+                to_units=pyo.units.kg / pyo.units.s,
+            )
+        )
+    )
+    blk.costing_package.cost_flow(
+        blk.unit_model.mass_flow_hydrogen_peroxide,
+        "h2o2",
+    )
 
 
 def cost_uv_aop_bundle(blk, reactor_cost, lamp_cost, factor_lamp_replacement):
