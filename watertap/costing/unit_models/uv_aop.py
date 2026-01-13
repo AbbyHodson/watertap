@@ -85,19 +85,22 @@ def cost_uv_aop(blk, cost_electricity_flow=True):
             "electricity",
         )
 
-    blk.unit_model.mass_flow_hydrogen_peroxide = pyo.Expression(
-        expr=(
-            pyo.units.convert(
-                blk.unit_model.hydrogen_peroxide_dose
-                * blk.unit_model.control_volume.properties_in[t0].flow_vol_phase["Liq"],
-                to_units=pyo.units.kg / pyo.units.s,
+    if blk.unit_model.config.has_aop:
+        blk.unit_model.mass_flow_hydrogen_peroxide = pyo.Expression(
+            expr=(
+                pyo.units.convert(
+                    blk.unit_model.hydrogen_peroxide_dose
+                    * blk.unit_model.control_volume.properties_in[t0].flow_vol_phase[
+                        "Liq"
+                    ],
+                    to_units=pyo.units.kg / pyo.units.s,
+                )
             )
         )
-    )
-    blk.costing_package.cost_flow(
-        blk.unit_model.mass_flow_hydrogen_peroxide,
-        "h2o2",
-    )
+        blk.costing_package.cost_flow(
+            blk.unit_model.mass_flow_hydrogen_peroxide,
+            "h2o2",
+        )
 
 
 def cost_uv_aop_bundle(blk, reactor_cost, lamp_cost, factor_lamp_replacement):
