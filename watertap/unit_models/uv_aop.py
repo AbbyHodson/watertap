@@ -454,11 +454,11 @@ class Ultraviolet0DData(InitializationMixin, UnitModelBlockData):
 
         # References for control volume
         # pressure change
-        if (
-            self.config.has_pressure_change is True
-            and self.config.momentum_balance_type != "none"
-        ):
-            self.deltaP = Reference(self.control_volume.deltaP)
+        # if (
+        #     self.config.has_pressure_change is True
+        #     and self.config.momentum_balance_type != "none"
+        # ):
+        #     self.deltaP = Reference(self.control_volume.deltaP)
 
         # UV dose
         @self.Constraint(
@@ -592,6 +592,13 @@ class Ultraviolet0DData(InitializationMixin, UnitModelBlockData):
                 domain=NonNegativeReals,
                 units=pyunits.M,
                 doc="Steady-state concentration of hydrogen peroxide.",
+            )
+            self.hydrogen_peroxide_dose = Var(
+                initialize=50,
+                bounds=(0, None),
+                domain=NonNegativeReals,
+                units=pyunits.mg /pyunits.liter,
+                doc="Dosage of hydrogen peroxide added to the UV reactor.",
             )
 
             @self.Constraint(
