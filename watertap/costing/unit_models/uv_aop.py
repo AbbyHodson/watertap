@@ -47,14 +47,18 @@ def build_uv_cost_param_block(blk):
     blk.reactor_cost = pyo.Var(
         initialize=202.346,
         doc="UV reactor cost",
-        units=pyo.units.USD_2018 / (pyo.units.m**3 / pyo.units.hr),
+        units=pyo.units.USD_2018
     )
     blk.lamp_cost = pyo.Var(
         initialize=235.5,
         doc="UV lamps, sleeves, ballasts and sensors cost",
         units=pyo.units.USD_2018 / pyo.units.kW,
     )
-
+    blk.dosing_system_cost = pyo.Var(
+        initialize=0,
+        doc="Cost of H2O2 dosing system, excluding chemical cost",
+        units=pyo.units.USD_2018,
+    )    
 
 @register_costing_parameter_block(
     build_rule=build_h2o2_cost_param_block,
@@ -73,6 +77,7 @@ def cost_uv_aop(blk, cost_electricity_flow=True):
         blk.costing_package.ultraviolet.reactor_cost,
         blk.costing_package.ultraviolet.lamp_cost,
         blk.costing_package.ultraviolet.factor_lamp_replacement,
+        blk.costing_package.ultraviolet.dosing_system_cost,
     )
 
     t0 = blk.flowsheet().time.first()
@@ -103,19 +108,22 @@ def cost_uv_aop(blk, cost_electricity_flow=True):
         )
 
 
-def cost_uv_aop_bundle(blk, reactor_cost, lamp_cost, factor_lamp_replacement):
+def cost_uv_aop_bundle(blk, reactor_cost, lamp_cost, factor_lamp_replacement, dosing_system_cost):
     """
     Generic function for costing a UV system.
 
     Args:
-        reactor_cost: The cost of UV reactor in [currency]/[volume]
+        reactor_cost: The cost of UV reactor in [currency]
         lamp_cost: The costs of the lamps, sleeves, ballasts and sensors in [currency]/[kW]
+        factor_lamp_replacement: Replacement factor for lamps, sleeves, ballasts and sensors [fraction of UV replaced/year]
+        dosing_system_cost: The cost of the H2O2 dosing system in [currency]
     """
     make_capital_cost_var(blk)
     make_fixed_operating_cost_var(blk)
     blk.reactor_cost = pyo.Expression(expr=reactor_cost)
     blk.lamp_cost = pyo.Expression(expr=lamp_cost)
     blk.factor_lamp_replacement = pyo.Expression(expr=factor_lamp_replacement)
+    blk.dosing_system_cost = pyo.Expression(expr=dosing_system_cost)
 
     flow_in = pyo.units.convert(
         blk.unit_model.control_volume.properties_in[0].flow_vol,
@@ -131,7 +139,7 @@ def cost_uv_aop_bundle(blk, reactor_cost, lamp_cost, factor_lamp_replacement):
         expr=blk.capital_cost
         == blk.cost_factor
         * pyo.units.convert(
-            blk.reactor_cost * flow_in + blk.lamp_cost * electricity_demand,
+            blk.reactor_cost + blk.lamp_cost * electricity_demand + blk.dosing_system_cost,
             to_units=blk.costing_package.base_currency,
         )
     )
