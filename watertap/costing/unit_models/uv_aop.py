@@ -17,7 +17,6 @@ from ..util import (
     make_fixed_operating_cost_var,
 )
 
-
 def build_h2o2_cost_param_block(blk):
 
     blk.cost = pyo.Param(
@@ -52,13 +51,53 @@ def build_uv_cost_param_block(blk):
     blk.lamp_cost = pyo.Var(
         initialize=235.5,
         doc="UV lamps, sleeves, ballasts and sensors cost",
-        units=pyo.units.USD_2018 / pyo.units.kW,
+        units=pyo.units.USD_2018,
     )
     blk.dosing_system_cost = pyo.Var(
         initialize=0,
         doc="Cost of H2O2 dosing system, excluding chemical cost",
         units=pyo.units.USD_2018,
-    )    
+    )
+    blk.gas_diffusion_cathode = pyo.Var(
+        initialize=0,
+        doc="Cost of gas diffusion cathode for electrochemical generation of H2O2",
+        units=pyo.units.USD_2018,
+    )
+    blk.graphine_anode = pyo.Var(
+        initialize=0,
+        doc="Cost of boron-doped reduced-graphene oxide anode for electrochemical generation of H2O2",
+        units=pyo.units.USD_2018,
+    )
+    blk.anode_cathode_replacement = pyo.Var(
+        initialize=0.5,
+        doc="Replacement factor for anode and cathode [fraction of electrochemical cell replaced/year]",
+        units=pyo.units.year**-1,
+    )
+    blk.cation_exchange_membrane = pyo.Var(
+        initialize=0,
+        doc="Cost of cation exchange membrane for electrochemical generation of H2O2",
+        units=pyo.units.USD_2018,
+    )
+    blk.steel_electrode = pyo.Var(
+        initialize=0,
+        doc="Cost of stainless-steel electrode for electrochemical generation of H2O2",
+        units=pyo.units.USD_2018,
+    )
+    blk.electrode_replacement = pyo.Var(
+        initialize=2,
+        doc="Replacement factor for steel electrode [fraction of electrochemical cell replaced/year]",
+        units=pyo.units.year**-1,
+    )
+    blk.electrochemical_reactor = pyo.Var(
+        initialize=0,
+        doc="Cost of reactor, reservoir, and metering pump for electrochemical generation of H2O2",
+        units=pyo.units.USD_2018,
+    )
+    blk.remainder_replacement = pyo.Var(
+        initialize=0.1,
+        doc="Replacement factor for reactor, metering pumps, reservoir, and membrane [fraction of electrochemical cell replaced/year]",
+        units=pyo.units.year**-1,
+    )                     
 
 @register_costing_parameter_block(
     build_rule=build_h2o2_cost_param_block,
@@ -78,6 +117,14 @@ def cost_uv_aop(blk, cost_electricity_flow=True):
         blk.costing_package.ultraviolet.lamp_cost,
         blk.costing_package.ultraviolet.factor_lamp_replacement,
         blk.costing_package.ultraviolet.dosing_system_cost,
+        blk.costing_package.ultraviolet.gas_diffusion_cathode,
+        blk.costing_package.ultraviolet.graphine_anode,
+        blk.costing_package.ultraviolet.cation_exchange_membrane,
+        blk.costing_package.ultraviolet.steel_electrode,
+        blk.costing_package.ultraviolet.electrochemical_reactor,
+        blk.costing_package.ultraviolet.anode_cathode_replacement,
+        blk.costing_package.ultraviolet.remainder_replacement,
+        blk.costing_package.ultraviolet.electrode_replacement,
     )
 
     t0 = blk.flowsheet().time.first()
@@ -108,15 +155,24 @@ def cost_uv_aop(blk, cost_electricity_flow=True):
         )
 
 
-def cost_uv_aop_bundle(blk, reactor_cost, lamp_cost, factor_lamp_replacement, dosing_system_cost):
+def cost_uv_aop_bundle(blk, reactor_cost, lamp_cost, factor_lamp_replacement, dosing_system_cost, gas_diffusion_cathode, graphine_anode, cation_exchange_membrane, steel_electrode, electrochemical_reactor, anode_cathode_replacement, remainder_replacement, electrode_replacement):
     """
     Generic function for costing a UV system.
 
     Args:
         reactor_cost: The cost of UV reactor in [currency]
-        lamp_cost: The costs of the lamps, sleeves, ballasts and sensors in [currency]/[kW]
+        lamp_cost: The costs of the lamps, sleeves, ballasts and sensors in [currency]
         factor_lamp_replacement: Replacement factor for lamps, sleeves, ballasts and sensors [fraction of UV replaced/year]
         dosing_system_cost: The cost of the H2O2 dosing system in [currency]
+        gas_diffusion_cathode: The cost of the gas diffusion cathode for electrochemical generation of H2O2 in [currency]
+        graphine_anode: The cost of the boron-doped reduced-graphene oxide anode for electrochemical generation of H2O2 in [currency]
+        cation_exchange_membrane: The cost of the cation exchange membrane for electrochemical generation of H2O2 in [currency]
+        steel_electrode: The cost of the stainless-steel electrode for electrochemical generation of H2O2 in [currency]
+        electrochemical_reactor: The cost of the reactor, reservoir, and metering pump for electrochemical generation of H2O2 in [currency]
+        anode_cathode_replacement: Replacement factor for anode and cathode [fraction of electrochemical cell replaced/year]
+        remainder_replacement: Replacement factor for reactor, metering pumps, reservoir, and membrane [fraction of electrochemical cell replaced/year]
+        electrode_replacement: Replacement factor for steel electrode [fraction of electrochemical cell replaced/year]
+
     """
     make_capital_cost_var(blk)
     make_fixed_operating_cost_var(blk)
@@ -124,29 +180,28 @@ def cost_uv_aop_bundle(blk, reactor_cost, lamp_cost, factor_lamp_replacement, do
     blk.lamp_cost = pyo.Expression(expr=lamp_cost)
     blk.factor_lamp_replacement = pyo.Expression(expr=factor_lamp_replacement)
     blk.dosing_system_cost = pyo.Expression(expr=dosing_system_cost)
-
-    flow_in = pyo.units.convert(
-        blk.unit_model.control_volume.properties_in[0].flow_vol,
-        to_units=pyo.units.m**3 / pyo.units.hr,
-    )
-
-    electricity_demand = pyo.units.convert(
-        blk.unit_model.electricity_demand[0], to_units=pyo.units.kW
-    )
+    blk.gas_diffusion_cathode = pyo.Expression(expr=gas_diffusion_cathode)
+    blk.graphine_anode = pyo.Expression(expr=graphine_anode)
+    blk.cation_exchange_membrane = pyo.Expression(expr=cation_exchange_membrane)
+    blk.steel_electrode = pyo.Expression(expr=steel_electrode)
+    blk.electrochemical_reactor = pyo.Expression(expr=electrochemical_reactor)
+    blk.anode_cathode_replacement = pyo.Expression(expr=anode_cathode_replacement)
+    blk.remainder_replacement = pyo.Expression(expr=remainder_replacement)
+    blk.electrode_replacement = pyo.Expression(expr=electrode_replacement)
 
     blk.costing_package.add_cost_factor(blk, "TIC")
     blk.capital_cost_constraint = pyo.Constraint(
         expr=blk.capital_cost
         == blk.cost_factor
         * pyo.units.convert(
-            blk.reactor_cost + blk.lamp_cost * electricity_demand + blk.dosing_system_cost,
+            blk.reactor_cost + blk.lamp_cost + blk.dosing_system_cost + blk.gas_diffusion_cathode + blk.graphine_anode + blk.cation_exchange_membrane + blk.steel_electrode + blk.electrochemical_reactor,
             to_units=blk.costing_package.base_currency,
         )
     )
     blk.fixed_operating_cost_constraint = pyo.Constraint(
         expr=blk.fixed_operating_cost
         == pyo.units.convert(
-            blk.factor_lamp_replacement * blk.lamp_cost * electricity_demand,
+            blk.factor_lamp_replacement * blk.lamp_cost + blk.anode_cathode_replacement*(blk.gas_diffusion_cathode + blk.graphine_anode) + blk.remainder_replacement*(blk.cation_exchange_membrane + blk.electrochemical_reactor) + blk.electrode_replacement*(blk.steel_electrode),  
             to_units=blk.costing_package.base_currency
             / blk.costing_package.base_period,
         )
